@@ -1,0 +1,124 @@
+<!-- 配置查看弹窗 -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalLabel">
+                    <i class="mdi mdi-script-text-outline"></i> 
+                    设备配置: <span id="modalDeviceName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div id="configStatus" class="text-muted"></div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="copyConfigBtn">
+                            <i class="mdi mdi-content-copy"></i> 复制配置
+                        </button>
+                    </div>
+                </div>
+                <div id="configContent" class="bg-dark text-light p-3 rounded" style="max-height: 500px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
+                    <div class="text-center text-muted">
+                        <i class="mdi mdi-loading mdi-spin"></i> 正在加载配置...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentDevicePk = null;
+    
+    // 为所有查看配置按钮添加点击事件
+    document.querySelectorAll('[data-config-toggle="modal"]').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            currentDevicePk = this.dataset.devicePk;
+            const deviceName = this.dataset.deviceName || '未知设备';
+            
+            // 设置设备名称
+            document.getElementById('modalDeviceName').textContent = deviceName;
+            
+            // 重置状态
+            document.getElementById('configStatus').textContent = '';
+            document.getElementById('configContent').innerHTML = '<div class="text-center text-muted"><i class="mdi mdi-loading mdi-spin"></i> 正在加载配置...</div>';
+            
+            // 显示弹窗
+            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            modal.show();
+            
+            // 加载配置内容
+            loadConfig(currentDevicePk);
+        });
+    });
+    
+    // 加载配置内容
+    function loadConfig(devicePk) {
+        const url = `/plugins/view-config/device/${devicePk}/config-api/`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const configContent = document.getElementById('configContent');
+                const configStatus = document.getElementById('configStatus');
+                
+                if (data.success) {
+                    configContent.textContent = data.config;
+                    configStatus.textContent = '配置加载完成';
+                    configStatus.className = 'text-success';
+                } else {
+                    configContent.innerHTML = `<div class="text-danger">${data.error}</div>`;
+                    configStatus.textContent = '配置加载失败';
+                    configStatus.className = 'text-danger';
+                }
+            })
+            .catch(error => {
+                const configContent = document.getElementById('configContent');
+                const configStatus = document.getElementById('configStatus');
+                
+                configContent.innerHTML = `<div class="text-danger">请求失败: ${error.message}</div>`;
+                configStatus.textContent = '请求失败';
+                configStatus.className = 'text-danger';
+            });
+    }
+    
+    // 复制配置功能
+    document.getElementById('copyConfigBtn').addEventListener('click', function() {
+        const configContent = document.getElementById('configContent');
+        const text = configContent.textContent;
+        
+        // 创建临时textarea进行复制
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            document.execCommand('copy');
+            
+            // 显示复制成功提示
+            const btn = document.getElementById('copyConfigBtn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="mdi mdi-check"></i> 已复制';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+            }, 2000);
+        } catch (err) {
+            console.error('复制失败:', err);
+        }
+        
+        document.body.removeChild(textarea);
+    });
+});
+</script>
