@@ -1,9 +1,13 @@
+import os
 from django.shortcuts import render
 from django.views.generic import View
+from django.http import JsonResponse
 from dcim.models import Device
-from netmiko import ConnectHandler
 from django.conf import settings
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from netmiko import ConnectHandler
 
 class DeviceConfigView(PermissionRequiredMixin, View):
     permission_required = 'dcim.view_device'
@@ -12,7 +16,7 @@ class DeviceConfigView(PermissionRequiredMixin, View):
         device = Device.objects.get(pk=pk)
         ip_obj = device.primary_ip4 or device.primary_ip6
         ip = str(ip_obj.address.ip) if ip_obj else None
-
+        
         return render(request, 'netbox_view_config/device_config.html', {
             'device': device,
             'device_ip': ip,
@@ -91,7 +95,7 @@ class DeviceConfigView(PermissionRequiredMixin, View):
                 f"1. 账号密码是否输入正确\n"
                 f"2. 设备的 'Platform' 字段是否正确设置\n"
                 f"3. 网络是否允许 SSH 连接"
-            )
+)
 
         return render(request, 'netbox_view_config/device_config.html', {
             'device': device,
@@ -100,3 +104,40 @@ class DeviceConfigView(PermissionRequiredMixin, View):
             'show_form': False,
             'username': username, # 回显用户名
         })
+
+
+class DeviceConfigAPIView(PermissionRequiredMixin, View):
+    permission_required = 'dcim.view_device'
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, pk):
+        device = Device.objects.get(pk=pk)
+        
+        # 构建配置文件路径 /opt/dir1/file1
+        # dir1 和 file1 作为占位符，可以根据需要修改
+        config_dir = 'dir1'  # 占位符，后续可修改
+        config_file = 'file1'  # 占位符，后续可修改
+        config_path = f'/opt/{config_dir}/{config_file}'
+        
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_content = f.read()
+                return JsonResponse({
+                    'success': True,
+                    'config': config_content,
+                    'device_name': device.name,
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'配置文件不存在: {config_path}'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'读取配置文件失败: {str(e)}'
+            })
